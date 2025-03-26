@@ -45,10 +45,19 @@ export default async function handler(req, res) {
       resultUrl: `/api/question/${requestId}/result`
     });
   } catch (error) {
-    console.error('API Error:', error);
+    const errorDetail = {
+      message: error.message,
+      stack: error.stack,
+      responseData: error.response?.data,
+      responseStatus: error.response?.status
+    };
+    
+    console.error('API Error:', JSON.stringify(errorDetail, null, 2));
+    
     return res.status(500).json({ 
       error: 'An error occurred while processing your request',
-      details: error.message 
+      details: error.message,
+      errorData: errorDetail
     });
   }
 }
@@ -100,15 +109,20 @@ async function processQuestionAsync(requestId, question) {
       deleteRequest(requestId);
     }, 60 * 60 * 1000);
   } catch (error) {
-    console.error('Processing Error:', error);
+    const errorDetail = {
+      message: error.message,
+      stack: error.stack,
+      responseData: error.response?.data,
+      responseStatus: error.response?.status,
+      code: error.code
+    };
+    
+    console.error('Processing Error:', JSON.stringify(errorDetail, null, 2));
     
     // Store the error
     updateRequest(requestId, {
       status: 'failed',
-      error: {
-        message: error.message,
-        details: error.stack
-      },
+      error: errorDetail,
       endTime: Date.now()
     });
   }
@@ -159,8 +173,16 @@ async function getGptResponse(question) {
 
     return response.data.choices[0].message.content.trim();
   } catch (error) {
-    console.error('GPT API Error:', error.response?.data || error.message);
-    throw new Error('Failed to generate AI response');
+    const errorDetail = {
+      message: error.message,
+      code: error.code,
+      responseData: error.response?.data,
+      responseStatus: error.response?.status
+    };
+    
+    console.error('GPT API Error:', JSON.stringify(errorDetail, null, 2));
+    
+    throw new Error(`Failed to generate AI response: ${error.message}`);
   }
 }
 
@@ -197,8 +219,16 @@ async function generateAndUploadSpeech(text) {
     console.log('Audio uploaded:', audioUrl);
     return audioUrl;
   } catch (error) {
-    console.error('ElevenLabs or Cloudinary Error:', error);
-    throw new Error('Failed to generate or upload speech');
+    const errorDetail = {
+      message: error.message,
+      code: error.code,
+      responseData: error.response?.data,
+      responseStatus: error.response?.status
+    };
+    
+    console.error('ElevenLabs or Cloudinary Error:', JSON.stringify(errorDetail, null, 2));
+    
+    throw new Error(`Failed to generate or upload speech: ${error.message}`);
   }
 }
 
@@ -260,8 +290,16 @@ async function generateVideo(audioUrl) {
     const talkId = response.data.id;
     return await waitForVideoCompletion(talkId);
   } catch (error) {
-    console.error('D-ID API Error:', error.response?.data || error.message);
-    throw new Error('Failed to generate video');
+    const errorDetail = {
+      message: error.message,
+      code: error.code,
+      responseData: error.response?.data,
+      responseStatus: error.response?.status
+    };
+    
+    console.error('D-ID API Error:', JSON.stringify(errorDetail, null, 2));
+    
+    throw new Error(`Failed to generate video: ${error.message}`);
   }
 }
 
@@ -293,8 +331,16 @@ async function waitForVideoCompletion(talkId) {
       await new Promise(resolve => setTimeout(resolve, 2000));
       attempts++;
     } catch (error) {
-      console.error('Error polling D-ID API:', error);
-      throw error;
+      const errorDetail = {
+        message: error.message,
+        code: error.code,
+        responseData: error.response?.data,
+        responseStatus: error.response?.status
+      };
+      
+      console.error('Error polling D-ID API:', JSON.stringify(errorDetail, null, 2));
+      
+      throw new Error(`D-ID polling error: ${error.message}`);
     }
   }
 
