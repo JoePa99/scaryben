@@ -71,12 +71,17 @@ export default async function handler(req, res) {
       }
     }
     
+    // Log demo mode status
+    console.log(`Processing question with fakeDemoMode: ${fakeDemoMode ? 'enabled' : 'disabled'}`);
+    
     // Process the request in the background
     if (fakeDemoMode) {
-      // Use fake demo mode for development/testing
+      // Use fake demo mode with reliable sample videos
+      console.log('Using demo mode with sample videos');
       simulateProcessing(requestId, question);
     } else {
       // Use real APIs in production
+      console.log('Using real APIs (OpenAI, ElevenLabs, D-ID)');
       processQuestionAsync(requestId, question);
     }
     

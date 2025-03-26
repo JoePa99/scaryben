@@ -7,9 +7,9 @@ export const submitQuestion = async (question, statusCallback, progressCallback)
   const statusUpdater = new StatusUpdater(statusCallback);
   
   try {
-    // Initial submission - using the direct endpoint to avoid routing issues
+    // Use the original endpoint - more reliable in production
     statusUpdater.thinking();
-    const initialResponse = await apiClient.post('/api/question_direct', { question });
+    const initialResponse = await apiClient.post('/api/question', { question });
     
     // Get request ID for polling or WebSocket
     const { requestId, statusUrl } = initialResponse.data;
@@ -71,8 +71,8 @@ const pollForResult = async (requestId, statusUpdater, progressCallback) => {
   
   while (pollCount < MAX_POLLS) {
     try {
-      // Check the current status - using the direct endpoint to avoid routing issues
-      const statusResponse = await apiClient.get(`/api/question_direct/requestId/${requestId}/status`);
+      // Use the original endpoint path - more reliable
+      const statusResponse = await apiClient.get(`/api/question/${requestId}/status`);
       const { status, stage, progress, resultReady, message } = statusResponse.data;
       
       // Update the UI with current status
@@ -103,9 +103,9 @@ const pollForResult = async (requestId, statusUpdater, progressCallback) => {
         throw new Error('Failed to process your question');
       }
       
-      // If the result is ready, get it and return - using the direct endpoint to avoid routing issues
+      // If the result is ready, get it and return - use the original endpoint path
       if (resultReady) {
-        const resultResponse = await apiClient.get(`/api/question_direct/requestId/${requestId}/result`);
+        const resultResponse = await apiClient.get(`/api/question/${requestId}/result`);
         return resultResponse.data;
       }
       

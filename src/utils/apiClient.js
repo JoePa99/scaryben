@@ -1,9 +1,9 @@
 import axios from 'axios';
 
 // Create axios instance with default configs
-// We're now using direct and explicit routes to avoid routing issues
+// Using baseURL for consistent routing
 const apiClient = axios.create({
-  // No baseURL - using full paths to avoid routing confusion
+  baseURL: '/', // Root-relative URLs for simplicity
   timeout: 120000, // 2 minutes - we need a long timeout for the video generation
   headers: {
     'Content-Type': 'application/json',
