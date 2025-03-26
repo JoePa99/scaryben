@@ -2,6 +2,15 @@ import { FRANKLIN_PERSONA } from '../../utils/prompts';
 import axios from 'axios';
 import { emitProcessUpdate } from './socketio';
 import { setRequest, updateRequest, deleteRequest, fakeDemoMode, simulateProcessing } from '../../utils/server-state';
+import { v2 as cloudinary } from 'cloudinary';
+import FormData from 'form-data';
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -66,12 +75,12 @@ async function processQuestionAsync(requestId, question) {
     const gptResponse = await getGptResponse(question);
     updateRequestStatus(requestId, 'speaking', 'Converting text to speech with ElevenLabs', 30);
     
-    // Step 2: Generate speech URL with ElevenLabs
-    const audioUrl = await generateElevenLabsSpeechUrl(gptResponse);
+    // Step 2: Generate speech with ElevenLabs and upload to Cloudinary
+    const audioUrl = await generateAndUploadSpeech(gptResponse);
     updateRequestStatus(requestId, 'animating', 'Animating Benjamin Franklin', 60);
     
     // Step 3: Generate talking head video with D-ID using the audio URL
-    const videoUrl = await generateVideoFromAudio(audioUrl, gptResponse);
+    const videoUrl = await generateVideo(audioUrl);
     
     // Store the completed result
     updateRequest(requestId, {
@@ -128,6 +137,7 @@ function updateRequestStatus(requestId, stage, message, progress) {
 
 async function getGptResponse(question) {
   try {
+    console.log('Getting GPT-4 response...');
     const response = await axios.post(
       'https://api.openai.com/v1/chat/completions',
       {
@@ -154,14 +164,13 @@ async function getGptResponse(question) {
   }
 }
 
-async function generateElevenLabsSpeechUrl(text) {
+async function generateAndUploadSpeech(text) {
   try {
-    // Create a streaming response from ElevenLabs
     console.log('Generating ElevenLabs speech...');
     
-    // Using the ElevenLabs hosted API directly, which gives us a URL we can use
+    // Step 1: Generate speech with ElevenLabs
     const response = await axios.post(
-      `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVENLABS_VOICE_ID}/stream`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVENLABS_VOICE_ID}`,
       {
         text,
         model_id: 'eleven_monolingual_v1',
@@ -175,38 +184,56 @@ async function generateElevenLabsSpeechUrl(text) {
           'Content-Type': 'application/json',
           'xi-api-key': process.env.ELEVENLABS_API_KEY,
         },
-        // Important: We're NOT using responseType: 'arraybuffer' here
+        responseType: 'arraybuffer'
       }
     );
     
-    // For some ElevenLabs API plans (like the Creator plan), you can get a
-    // streaming URL directly, which we can use with D-ID
-    // This is just an example - you'll need to adjust based on your plan
+    // Step 2: Upload the audio file to Cloudinary
+    console.log('Uploading audio to Cloudinary...');
     
-    // Create a unique public URL with their history API
-    const historyResponse = await axios.get(
-      'https://api.elevenlabs.io/v1/history',
+    const audioBuffer = Buffer.from(response.data);
+    const audioUrl = await uploadToCloudinary(audioBuffer);
+    
+    console.log('Audio uploaded:', audioUrl);
+    return audioUrl;
+  } catch (error) {
+    console.error('ElevenLabs or Cloudinary Error:', error);
+    throw new Error('Failed to generate or upload speech');
+  }
+}
+
+// Function to upload buffer to Cloudinary
+function uploadToCloudinary(buffer) {
+  return new Promise((resolve, reject) => {
+    const timestamp = new Date().getTime();
+    const filename = `franklin-audio-${timestamp}.mp3`;
+    
+    // Create upload stream
+    const uploadStream = cloudinary.uploader.upload_stream(
       {
-        headers: {
-          'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        resource_type: 'auto',
+        public_id: `franklin-audio/${filename}`,
+        format: 'mp3'
+      },
+      (error, result) => {
+        if (error) {
+          console.error('Cloudinary upload error:', error);
+          reject(error);
+        } else {
+          resolve(result.secure_url);
         }
       }
     );
     
-    // Find the most recent audio generation (should match what we just created)
-    const latestAudio = historyResponse.data.history[0];
-    const audioUrl = `https://elevenlabs.io/api/download/${latestAudio.history_item_id}`;
-    
-    console.log('Generated ElevenLabs speech URL:', audioUrl);
-    return audioUrl;
-  } catch (error) {
-    console.error('ElevenLabs API Error:', error.response?.data || error.message);
-    throw new Error('Failed to generate speech with ElevenLabs');
-  }
+    // Write buffer to stream
+    uploadStream.write(buffer);
+    uploadStream.end();
+  });
 }
 
-async function generateVideoFromAudio(audioUrl, text) {
+async function generateVideo(audioUrl) {
   try {
+    console.log('Generating D-ID video with audio URL:', audioUrl);
     // Send the audio URL to D-ID
     const response = await axios.post(
       'https://api.d-id.com/talks',
