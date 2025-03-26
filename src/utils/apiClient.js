@@ -12,13 +12,12 @@ const apiClient = axios.create({
 // Add a request interceptor for logging and handling
 apiClient.interceptors.request.use(
   (config) => {
-    // You can add logging here in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`API Request to ${config.url}`);
-    }
+    // Log requests in development and production (helps with debugging)
+    console.log(`API Request to ${config.url}`);
     return config;
   },
   (error) => {
+    console.error('Request error:', error.message);
     return Promise.reject(error);
   }
 );
@@ -26,17 +25,40 @@ apiClient.interceptors.request.use(
 // Add a response interceptor for global error handling
 apiClient.interceptors.response.use(
   (response) => {
+    // Log successful responses in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`API Response from ${response.config.url}: Status ${response.status}`);
+    }
     return response;
   },
   (error) => {
-    // Transform and standardize error responses
-    const customError = {
-      message: 'An error occurred while processing your request',
-      status: error.response?.status || 500,
+    // Get detailed error information
+    const errorInfo = {
+      message: error.message || 'Unknown error occurred',
+      status: error.response?.status || 'No status',
+      statusText: error.response?.statusText || 'No status text',
+      url: error.config?.url || 'Unknown URL',
+      method: error.config?.method?.toUpperCase() || 'Unknown method',
       data: error.response?.data || {},
     };
+    
+    // Log detailed error for debugging
+    console.error(`API Error (${errorInfo.status}) on ${errorInfo.method} ${errorInfo.url}:`, 
+                 errorInfo.message, errorInfo);
 
-    // You could add error reporting to a service like Sentry here
+    // Create a user-friendly error with detailed debugging information
+    const customError = new Error(
+      error.response?.data?.error || 
+      error.response?.data?.message || 
+      'Failed to process your question'
+    );
+    
+    // Add detailed properties to the error object
+    customError.status = errorInfo.status;
+    customError.statusText = errorInfo.statusText;
+    customError.url = errorInfo.url;
+    customError.data = errorInfo.data;
+    customError.originalError = error;
 
     return Promise.reject(customError);
   }

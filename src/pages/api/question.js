@@ -27,6 +27,50 @@ export default async function handler(req, res) {
     // Create a unique ID for this request
     const requestId = Date.now().toString();
     
+    // Check for required environment variables before proceeding
+    const requiredEnvVars = [
+      'OPENAI_API_KEY',
+      'ELEVENLABS_API_KEY',
+      'ELEVENLABS_VOICE_ID',
+      'DID_API_KEY',
+      'BEN_FRANKLIN_IMAGE_URL',
+      'CLOUDINARY_CLOUD_NAME',
+      'CLOUDINARY_API_KEY',
+      'CLOUDINARY_API_SECRET'
+    ];
+    
+    // If we're not in demo mode, verify all required env vars are set
+    if (!fakeDemoMode) {
+      const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+      
+      if (missingVars.length > 0) {
+        console.error(`Missing required environment variables: ${missingVars.join(', ')}`);
+        
+        // Initialize request with error status
+        setRequest(requestId, {
+          status: 'failed',
+          stage: 'setup',
+          progress: 0,
+          startTime: Date.now(),
+          endTime: Date.now(),
+          question,
+          result: null,
+          error: {
+            message: `Missing environment variables: ${missingVars.join(', ')}`,
+            details: 'Configuration error'
+          }
+        });
+        
+        return res.status(202).json({ 
+          requestId,
+          status: 'processing',
+          message: 'Your question is being processed',
+          statusUrl: `/api/question/${requestId}/status`,
+          resultUrl: `/api/question/${requestId}/result`
+        });
+      }
+    }
+    
     // Process the request in the background
     if (fakeDemoMode) {
       // Use fake demo mode for development/testing
@@ -46,7 +90,7 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     const errorDetail = {
-      message: error.message,
+      message: error.message || 'Unknown error',
       stack: error.stack,
       responseData: error.response?.data,
       responseStatus: error.response?.status
@@ -54,9 +98,10 @@ export default async function handler(req, res) {
     
     console.error('API Error:', JSON.stringify(errorDetail, null, 2));
     
+    // Return a more descriptive error
     return res.status(500).json({ 
       error: 'An error occurred while processing your request',
-      details: error.message,
+      details: error.message || 'Unknown error',
       errorData: errorDetail
     });
   }

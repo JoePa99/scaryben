@@ -17,11 +17,43 @@ export default function Home() {
 
       <main>
         <QuestionForm />
+        
+        <div className="debug-panel">
+          <h3>Troubleshooting</h3>
+          <a href="/api/debug" target="_blank" rel="noopener noreferrer" className="debug-link">
+            Access API Diagnostics
+          </a>
+        </div>
       </main>
 
       <footer className="footer">
         <p>© {new Date().getFullYear()} Franklin Debt Advisor</p>
       </footer>
+
+      <style jsx>{`
+        .debug-panel {
+          margin-top: 2rem;
+          padding: 1rem;
+          background: #f8f9fa;
+          border-radius: 8px;
+          text-align: center;
+          border: 1px solid #dee2e6;
+        }
+        
+        .debug-link {
+          display: inline-block;
+          padding: 0.5rem 1rem;
+          background: #0070f3;
+          color: white;
+          border-radius: 4px;
+          text-decoration: none;
+          margin-top: 0.5rem;
+        }
+        
+        .debug-link:hover {
+          background: #0051a8;
+        }
+      `}</style>
     </div>
   );
 }
