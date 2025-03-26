@@ -92,6 +92,24 @@ export default function Debug() {
               <pre>{JSON.stringify(debug?.results?.environment, null, 2)}</pre>
             </div>
             
+            {debug?.results?.environment?.BEN_FRANKLIN_IMAGE_URL && 
+              debug?.results?.environment?.BEN_FRANKLIN_IMAGE_URL.includes('postimg.cc/') && 
+              !debug?.results?.environment?.BEN_FRANKLIN_IMAGE_URL.endsWith('.jpg') && 
+              !debug?.results?.environment?.BEN_FRANKLIN_IMAGE_URL.endsWith('.png') && (
+              <div className="alert alert-warning" style={{
+                background: '#fff3cd', 
+                color: '#856404', 
+                padding: '12px', 
+                borderRadius: '4px', 
+                margin: '15px 0',
+                border: '1px solid #ffeeba'
+              }}>
+                <strong>Warning:</strong> Your BEN_FRANKLIN_IMAGE_URL appears to be a postimg.cc page URL, not a direct image URL. 
+                <br />
+                Visit the page, right-click on the image, and select "Copy Image Address" to get the direct URL which should end with .jpg or .png
+              </div>
+            )}
+            
             <h2>API Connection Tests</h2>
             {renderApiSection('OpenAI', debug?.results?.tests?.openai)}
             {renderApiSection('ElevenLabs', debug?.results?.tests?.elevenlabs)}

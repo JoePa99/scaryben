@@ -96,7 +96,12 @@ const QuestionForm = () => {
               controls 
               autoPlay 
               src={videoUrl}
+              onError={(e) => console.error("Video error:", e.target.error, "Video URL:", videoUrl)}
             />
+            {/* Debug info to see the URL */}
+            <div className="debug-info" style={{fontSize: '10px', color: '#999', marginTop: '5px'}}>
+              Video URL: {videoUrl}
+            </div>
           </div>
           
           <div className="answer-text">

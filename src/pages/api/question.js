@@ -306,9 +306,41 @@ function uploadToCloudinary(buffer) {
   });
 }
 
+// Helper function to validate and possibly fix an image URL
+function getValidImageUrl(url) {
+  if (!url) return null;
+  
+  // If it's already a direct image URL, return it
+  if (url.match(/\.(jpeg|jpg|gif|png)(\?.*)?$/i)) {
+    console.log('Using direct image URL:', url);
+    return url;
+  }
+  
+  // If it's a postimg.cc URL but not a direct image URL
+  if (url.includes('postimg.cc/') && !url.endsWith('.jpg') && !url.endsWith('.png')) {
+    // Try to convert from page URL to direct image URL
+    // Example: https://postimg.cc/CRTKLmTZ -> https://i.postimg.cc/CRTKLmTZ/ben-franklin.jpg
+    const id = url.split('/').pop();
+    if (id) {
+      const directUrl = `https://i.postimg.cc/${id}/benjamin-franklin.jpg`;
+      console.log('Converting to direct image URL:', directUrl);
+      return directUrl;
+    }
+  }
+  
+  // Return original URL with warning
+  console.warn('Using potentially invalid image URL:', url);
+  return url;
+}
+
 async function generateVideo(audioUrl) {
   try {
     console.log('Generating D-ID video with audio URL:', audioUrl);
+    
+    // Validate and fix the image URL if needed
+    const imageUrl = getValidImageUrl(process.env.BEN_FRANKLIN_IMAGE_URL);
+    console.log('Using image URL for D-ID:', imageUrl);
+    
     // Send the audio URL to D-ID
     const response = await axios.post(
       'https://api.d-id.com/talks',
@@ -317,7 +349,7 @@ async function generateVideo(audioUrl) {
           type: 'audio',
           audio_url: audioUrl,
         },
-        source_url: process.env.BEN_FRANKLIN_IMAGE_URL,
+        source_url: imageUrl,
         // Optionally customize the appearance
         config: {
           stitch: true
@@ -352,9 +384,11 @@ async function waitForVideoCompletion(talkId) {
   // Poll the D-ID API until the video is ready
   let attempts = 0;
   const maxAttempts = 30; // 30 attempts * 2 second delay = max 1 minute wait
+  console.log(`Waiting for D-ID video to complete, talk ID: ${talkId}`);
 
   while (attempts < maxAttempts) {
     try {
+      console.log(`Polling D-ID API for talk status, attempt ${attempts + 1}/${maxAttempts}`);
       const response = await axios.get(
         `https://api.d-id.com/talks/${talkId}`,
         {
@@ -365,11 +399,17 @@ async function waitForVideoCompletion(talkId) {
       );
 
       const status = response.data.status;
+      console.log(`D-ID talk status: ${status}`);
 
       if (status === 'done') {
-        return response.data.result_url;
+        const resultUrl = response.data.result_url;
+        console.log(`D-ID video complete, result URL: ${resultUrl}`);
+        return resultUrl;
       } else if (status === 'failed') {
-        throw new Error('D-ID video generation failed');
+        console.error('D-ID video generation failed:', response.data);
+        throw new Error(`D-ID video generation failed: ${JSON.stringify(response.data)}`);
+      } else {
+        console.log(`D-ID video status: ${status}, waiting...`);
       }
 
       // Wait before polling again
@@ -389,5 +429,6 @@ async function waitForVideoCompletion(talkId) {
     }
   }
 
+  console.error('D-ID video generation timed out after maximum attempts');
   throw new Error('Video generation timed out');
 }
