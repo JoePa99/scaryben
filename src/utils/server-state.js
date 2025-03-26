@@ -74,6 +74,7 @@ export const simulateProcessing = async (requestId, question) => {
       endTime: Date.now(),
       result: {
         answer: "The national debt is a burden we place upon future generations. As I once wrote, 'Think what you do when you run in debt; you give to another power over your liberty.' Today's debt, exceeding $34 trillion, would be incomprehensible in my day. We fought for economic freedom from Britain, yet now America binds itself with chains of financial obligation. Remember, a penny saved is a penny earned, but trillions borrowed is liberty spurned.",
+        audioUrl: "https://elevenlabs.io/api/download/demo-franklin-audio",
         videoUrl: "https://d-id-talks-prod.s3.us-west-2.amazonaws.com/or9uzctrt2/tlk_Wl-oSCPzXm3GQHD3oZO9h/1706747167146.mp4"
       }
     });

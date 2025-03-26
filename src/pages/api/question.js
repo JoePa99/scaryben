@@ -64,11 +64,14 @@ async function processQuestionAsync(requestId, question) {
     // Step 1: Get response from GPT-4
     updateRequestStatus(requestId, 'thinking', 'Generating Franklin\'s response', 10);
     const gptResponse = await getGptResponse(question);
-    updateRequestStatus(requestId, 'animating', 'Animating Benjamin Franklin', 50);
+    updateRequestStatus(requestId, 'speaking', 'Converting text to speech with ElevenLabs', 30);
     
-    // Step 2: Generate talking head video with D-ID directly using the text
-    // This skips the ElevenLabs step and storage requirement
-    const videoUrl = await generateVideoFromText(gptResponse);
+    // Step 2: Generate speech URL with ElevenLabs
+    const audioUrl = await generateElevenLabsSpeechUrl(gptResponse);
+    updateRequestStatus(requestId, 'animating', 'Animating Benjamin Franklin', 60);
+    
+    // Step 3: Generate talking head video with D-ID using the audio URL
+    const videoUrl = await generateVideoFromAudio(audioUrl, gptResponse);
     
     // Store the completed result
     updateRequest(requestId, {
@@ -78,6 +81,7 @@ async function processQuestionAsync(requestId, question) {
       endTime: Date.now(),
       result: {
         answer: gptResponse,
+        audioUrl,
         videoUrl
       }
     });
@@ -150,22 +154,66 @@ async function getGptResponse(question) {
   }
 }
 
-async function generateVideoFromText(text) {
+async function generateElevenLabsSpeechUrl(text) {
   try {
-    // Send the text directly to D-ID
+    // Create a streaming response from ElevenLabs
+    console.log('Generating ElevenLabs speech...');
+    
+    // Using the ElevenLabs hosted API directly, which gives us a URL we can use
+    const response = await axios.post(
+      `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVENLABS_VOICE_ID}/stream`,
+      {
+        text,
+        model_id: 'eleven_monolingual_v1',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75
+        }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        },
+        // Important: We're NOT using responseType: 'arraybuffer' here
+      }
+    );
+    
+    // For some ElevenLabs API plans (like the Creator plan), you can get a
+    // streaming URL directly, which we can use with D-ID
+    // This is just an example - you'll need to adjust based on your plan
+    
+    // Create a unique public URL with their history API
+    const historyResponse = await axios.get(
+      'https://api.elevenlabs.io/v1/history',
+      {
+        headers: {
+          'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        }
+      }
+    );
+    
+    // Find the most recent audio generation (should match what we just created)
+    const latestAudio = historyResponse.data.history[0];
+    const audioUrl = `https://elevenlabs.io/api/download/${latestAudio.history_item_id}`;
+    
+    console.log('Generated ElevenLabs speech URL:', audioUrl);
+    return audioUrl;
+  } catch (error) {
+    console.error('ElevenLabs API Error:', error.response?.data || error.message);
+    throw new Error('Failed to generate speech with ElevenLabs');
+  }
+}
+
+async function generateVideoFromAudio(audioUrl, text) {
+  try {
+    // Send the audio URL to D-ID
     const response = await axios.post(
       'https://api.d-id.com/talks',
       {
         script: {
-          type: 'text',
-          input: text,
-          provider: {
-            type: 'microsoft',
-            voice_id: 'en-US-GuyNeural', // You can replace with another voice if preferred
-            voice_config: {
-              style: 'serious'
-            }
-          }
+          type: 'audio',
+          audio_url: audioUrl,
         },
         source_url: process.env.BEN_FRANKLIN_IMAGE_URL,
         // Optionally customize the appearance
