@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 // Create axios instance with default configs
+// Note: baseURL is set to '/api', so all paths in apiService.js should NOT include '/api/' prefix
 const apiClient = axios.create({
   baseURL: '/api',
   timeout: 120000, // 2 minutes - we need a long timeout for the video generation
