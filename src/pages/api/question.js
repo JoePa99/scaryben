@@ -64,14 +64,11 @@ async function processQuestionAsync(requestId, question) {
     // Step 1: Get response from GPT-4
     updateRequestStatus(requestId, 'thinking', 'Generating Franklin\'s response', 10);
     const gptResponse = await getGptResponse(question);
-    updateRequestStatus(requestId, 'speaking', 'Converting text to speech', 30);
+    updateRequestStatus(requestId, 'animating', 'Animating Benjamin Franklin', 50);
     
-    // Step 2: Convert text to speech with ElevenLabs
-    const audioFile = await generateSpeech(gptResponse);
-    updateRequestStatus(requestId, 'animating', 'Animating Benjamin Franklin', 60);
-    
-    // Step 3: Generate talking head video with D-ID
-    const videoUrl = await generateVideo(audioFile);
+    // Step 2: Generate talking head video with D-ID directly using the text
+    // This skips the ElevenLabs step and storage requirement
+    const videoUrl = await generateVideoFromText(gptResponse);
     
     // Store the completed result
     updateRequest(requestId, {
@@ -81,7 +78,6 @@ async function processQuestionAsync(requestId, question) {
       endTime: Date.now(),
       result: {
         answer: gptResponse,
-        audioUrl: audioFile.url,
         videoUrl
       }
     });
@@ -154,64 +150,28 @@ async function getGptResponse(question) {
   }
 }
 
-async function generateSpeech(text) {
+async function generateVideoFromText(text) {
   try {
-    const response = await axios.post(
-      `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVENLABS_VOICE_ID}`,
-      {
-        text,
-        model_id: 'eleven_monolingual_v1',
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.8
-        }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'xi-api-key': process.env.ELEVENLABS_API_KEY,
-        },
-        responseType: 'arraybuffer'
-      }
-    );
-
-    // For D-ID we need a publicly accessible URL, so we would typically
-    // upload this to a storage service (S3, Cloudinary, etc)
-    // For this example, let's assume we have a function to handle that:
-    const audioUrl = await uploadAudioToStorage(response.data);
-    
-    return {
-      buffer: response.data,
-      url: audioUrl
-    };
-  } catch (error) {
-    console.error('ElevenLabs API Error:', error.response?.data || error.message);
-    throw new Error('Failed to generate speech');
-  }
-}
-
-// This is a mock function - in a real app, you would upload the audio to S3, Cloudinary, etc.
-async function uploadAudioToStorage(audioBuffer) {
-  // In a real implementation:
-  // 1. Upload the audio file to a storage service
-  // 2. Return the public URL
-  
-  // For demonstration purposes only:
-  console.log('Uploading audio to storage (mocked)');
-  // This would be replaced with actual upload logic
-  return 'https://storage-service.example.com/franklin-audio-' + Date.now() + '.mp3';
-}
-
-async function generateVideo(audioFile) {
-  try {
+    // Send the text directly to D-ID
     const response = await axios.post(
       'https://api.d-id.com/talks',
       {
         script: {
-          type: 'audio',
-          audio_url: audioFile.url,
+          type: 'text',
+          input: text,
+          provider: {
+            type: 'microsoft',
+            voice_id: 'en-US-GuyNeural', // You can replace with another voice if preferred
+            voice_config: {
+              style: 'serious'
+            }
+          }
         },
         source_url: process.env.BEN_FRANKLIN_IMAGE_URL,
+        // Optionally customize the appearance
+        config: {
+          stitch: true
+        }
       },
       {
         headers: {
