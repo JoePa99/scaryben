@@ -32,8 +32,8 @@ export const updateRequest = (requestId, updates) => {
   return null;
 };
 
-// For demo purposes only - ALWAYS enabled for now until we fix API issues
-export const fakeDemoMode = true;
+// Demo mode - set to false to use real APIs
+export const fakeDemoMode = process.env.FAKE_DEMO_MODE === 'true';
 
 // Sample videos for demo mode
 const SAMPLE_VIDEOS = [

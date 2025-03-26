@@ -235,7 +235,17 @@ async function generateAndUploadSpeech(text) {
   try {
     console.log('Generating ElevenLabs speech...');
     
+    // Validate ElevenLabs configuration
+    if (!process.env.ELEVENLABS_API_KEY) {
+      throw new Error('ELEVENLABS_API_KEY is not configured');
+    }
+    
+    if (!process.env.ELEVENLABS_VOICE_ID) {
+      throw new Error('ELEVENLABS_VOICE_ID is not configured');
+    }
+    
     // Step 1: Generate speech with ElevenLabs
+    console.log(`Using ElevenLabs voice ID: ${process.env.ELEVENLABS_VOICE_ID}`);
     const response = await axios.post(
       `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVENLABS_VOICE_ID}`,
       {
@@ -257,6 +267,13 @@ async function generateAndUploadSpeech(text) {
     
     // Step 2: Upload the audio file to Cloudinary
     console.log('Uploading audio to Cloudinary...');
+    
+    // Validate Cloudinary configuration
+    if (!process.env.CLOUDINARY_CLOUD_NAME || 
+        !process.env.CLOUDINARY_API_KEY || 
+        !process.env.CLOUDINARY_API_SECRET) {
+      throw new Error('Cloudinary configuration is incomplete');
+    }
     
     const audioBuffer = Buffer.from(response.data);
     const audioUrl = await uploadToCloudinary(audioBuffer);
@@ -308,7 +325,10 @@ function uploadToCloudinary(buffer) {
 
 // Helper function to validate and possibly fix an image URL
 function getValidImageUrl(url) {
-  if (!url) return null;
+  if (!url) {
+    // Default fallback image if none provided
+    return 'https://i.postimg.cc/j22xfNH6/benjamin-franklin.jpg';
+  }
   
   // If it's already a direct image URL, return it
   if (url.match(/\.(jpeg|jpg|gif|png)(\?.*)?$/i)) {
@@ -316,14 +336,28 @@ function getValidImageUrl(url) {
     return url;
   }
   
-  // If it's a postimg.cc URL but not a direct image URL
+  // Handle different image hosting services
+  
+  // Handle postimg.cc
   if (url.includes('postimg.cc/') && !url.endsWith('.jpg') && !url.endsWith('.png')) {
     // Try to convert from page URL to direct image URL
-    // Example: https://postimg.cc/CRTKLmTZ -> https://i.postimg.cc/CRTKLmTZ/ben-franklin.jpg
+    // Example: https://postimg.cc/CRTKLmTZ -> https://i.postimg.cc/CRTKLmTZ/benjamin-franklin.jpg
     const id = url.split('/').pop();
     if (id) {
       const directUrl = `https://i.postimg.cc/${id}/benjamin-franklin.jpg`;
-      console.log('Converting to direct image URL:', directUrl);
+      console.log('Converting postimg.cc URL to direct image URL:', directUrl);
+      return directUrl;
+    }
+  }
+  
+  // Handle imgur
+  if (url.includes('imgur.com/') && !url.endsWith('.jpg') && !url.endsWith('.png')) {
+    // Try to convert from page URL to direct image URL
+    // Example: https://imgur.com/abcd123 -> https://i.imgur.com/abcd123.jpg
+    const id = url.split('/').pop();
+    if (id) {
+      const directUrl = `https://i.imgur.com/${id}.jpg`;
+      console.log('Converting imgur URL to direct image URL:', directUrl);
       return directUrl;
     }
   }
@@ -337,9 +371,29 @@ async function generateVideo(audioUrl) {
   try {
     console.log('Generating D-ID video with audio URL:', audioUrl);
     
+    // Validate D-ID configuration
+    if (!process.env.DID_API_KEY) {
+      throw new Error('DID_API_KEY is not configured');
+    }
+    
+    if (!process.env.BEN_FRANKLIN_IMAGE_URL) {
+      throw new Error('BEN_FRANKLIN_IMAGE_URL is not configured');
+    }
+    
     // Validate and fix the image URL if needed
     const imageUrl = getValidImageUrl(process.env.BEN_FRANKLIN_IMAGE_URL);
     console.log('Using image URL for D-ID:', imageUrl);
+    
+    // Validate the image URL is accessible
+    try {
+      const imageCheckResponse = await axios.head(imageUrl);
+      if (imageCheckResponse.status !== 200) {
+        console.warn(`Image URL returned status ${imageCheckResponse.status}`);
+      }
+    } catch (imageError) {
+      console.error('Image URL check failed:', imageError.message);
+      throw new Error(`The image URL is not accessible: ${imageError.message}`);
+    }
     
     // Send the audio URL to D-ID
     const response = await axios.post(

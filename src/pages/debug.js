@@ -92,6 +92,22 @@ export default function Debug() {
               <pre>{JSON.stringify(debug?.results?.environment, null, 2)}</pre>
             </div>
             
+            {/* Environment variable warnings */}
+            {debug?.results?.environment?.FAKE_DEMO_MODE === 'true' && (
+              <div className="alert alert-info" style={{
+                background: '#d1ecf1', 
+                color: '#0c5460', 
+                padding: '12px', 
+                borderRadius: '4px', 
+                margin: '15px 0',
+                border: '1px solid #bee5eb'
+              }}>
+                <strong>Demo Mode Active:</strong> The application is running in demo mode with sample videos.
+                <br />
+                Set FAKE_DEMO_MODE to "false" in your environment variables to use the real APIs.
+              </div>
+            )}
+            
             {debug?.results?.environment?.BEN_FRANKLIN_IMAGE_URL && 
               debug?.results?.environment?.BEN_FRANKLIN_IMAGE_URL.includes('postimg.cc/') && 
               !debug?.results?.environment?.BEN_FRANKLIN_IMAGE_URL.endsWith('.jpg') && 
@@ -107,6 +123,21 @@ export default function Debug() {
                 <strong>Warning:</strong> Your BEN_FRANKLIN_IMAGE_URL appears to be a postimg.cc page URL, not a direct image URL. 
                 <br />
                 Visit the page, right-click on the image, and select "Copy Image Address" to get the direct URL which should end with .jpg or .png
+              </div>
+            )}
+            
+            {!debug?.results?.environment?.CLOUDINARY_CLOUD_NAME && (
+              <div className="alert alert-warning" style={{
+                background: '#fff3cd', 
+                color: '#856404', 
+                padding: '12px', 
+                borderRadius: '4px', 
+                margin: '15px 0',
+                border: '1px solid #ffeeba'
+              }}>
+                <strong>Missing Cloudinary Configuration:</strong> CLOUDINARY_CLOUD_NAME is required for audio storage.
+                <br />
+                Sign up at <a href="https://cloudinary.com" target="_blank" rel="noopener noreferrer" style={{color: '#856404', textDecoration: 'underline'}}>cloudinary.com</a> and add the cloud name to your environment variables.
               </div>
             )}
             
