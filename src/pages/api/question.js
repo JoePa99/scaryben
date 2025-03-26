@@ -1,9 +1,7 @@
 import { FRANKLIN_PERSONA } from '../../utils/prompts';
 import axios from 'axios';
 import { emitProcessUpdate } from './socketio';
-
-// In a real application, this would be handled with a database or queue system
-export const pendingRequests = new Map();
+import { setRequest, updateRequest, deleteRequest, fakeDemoMode, simulateProcessing } from '../../utils/server-state';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -21,14 +19,19 @@ export default async function handler(req, res) {
     const requestId = Date.now().toString();
     
     // Process the request in the background
-    processQuestionAsync(requestId, question);
+    if (fakeDemoMode) {
+      // Use fake demo mode for development/testing
+      simulateProcessing(requestId, question);
+    } else {
+      // Use real APIs in production
+      processQuestionAsync(requestId, question);
+    }
     
     // Immediately return a response with the request ID
     return res.status(202).json({ 
       requestId,
       status: 'processing',
       message: 'Your question is being processed',
-      // This is where we'd pass a WebSocket URL or polling endpoint
       statusUrl: `/api/question/${requestId}/status`,
       resultUrl: `/api/question/${requestId}/result`
     });
@@ -48,7 +51,7 @@ export default async function handler(req, res) {
 async function processQuestionAsync(requestId, question) {
   try {
     // Initialize request state
-    pendingRequests.set(requestId, {
+    setRequest(requestId, {
       status: 'processing',
       stage: 'thinking',
       progress: 0,
@@ -71,8 +74,7 @@ async function processQuestionAsync(requestId, question) {
     const videoUrl = await generateVideo(audioFile);
     
     // Store the completed result
-    pendingRequests.set(requestId, {
-      ...pendingRequests.get(requestId),
+    updateRequest(requestId, {
       status: 'completed',
       stage: 'completed',
       progress: 100,
@@ -84,18 +86,15 @@ async function processQuestionAsync(requestId, question) {
       }
     });
 
-    // In a real app, we'd notify the client via WebSocket here
-    
     // Clean up after 1 hour (in a real app, this would be stored in a database)
     setTimeout(() => {
-      pendingRequests.delete(requestId);
+      deleteRequest(requestId);
     }, 60 * 60 * 1000);
   } catch (error) {
     console.error('Processing Error:', error);
     
     // Store the error
-    pendingRequests.set(requestId, {
-      ...pendingRequests.get(requestId),
+    updateRequest(requestId, {
       status: 'failed',
       error: {
         message: error.message,
@@ -107,18 +106,13 @@ async function processQuestionAsync(requestId, question) {
 }
 
 function updateRequestStatus(requestId, stage, message, progress) {
-  const request = pendingRequests.get(requestId);
-  if (request) {
-    const updatedRequest = {
-      ...request,
-      stage,
-      message,
-      progress,
-      lastUpdated: Date.now()
-    };
-    
-    pendingRequests.set(requestId, updatedRequest);
-    
+  const updatedRequest = updateRequest(requestId, {
+    stage,
+    message,
+    progress
+  });
+  
+  if (updatedRequest) {
     // Emit WebSocket event for real-time updates
     emitProcessUpdate(requestId, {
       requestId,

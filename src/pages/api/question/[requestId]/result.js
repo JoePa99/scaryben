@@ -1,5 +1,5 @@
-// Access the pending requests map from the main handler
-import { pendingRequests } from '../../question';
+// Access the pending requests map from our server state module
+import { getRequest } from '../../../../utils/server-state';
 
 export default function handler(req, res) {
   if (req.method !== 'GET') {
@@ -13,7 +13,7 @@ export default function handler(req, res) {
       return res.status(400).json({ error: 'Request ID is required' });
     }
 
-    const requestData = pendingRequests.get(requestId);
+    const requestData = getRequest(requestId);
     
     if (!requestData) {
       return res.status(404).json({ error: 'Request not found' });
