@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 
+// Force clean deployment to pick up new environment variables
 export default function Debug() {
   const [debug, setDebug] = useState(null);
   const [loading, setLoading] = useState(true);

@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import QuestionForm from '../components/QuestionForm';
 
+// Updated version to force rebuild and pick up env vars
 export default function Home() {
   return (
     <div className="container">
