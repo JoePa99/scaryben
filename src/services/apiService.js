@@ -7,9 +7,9 @@ export const submitQuestion = async (question, statusCallback, progressCallback)
   const statusUpdater = new StatusUpdater(statusCallback);
   
   try {
-    // Initial submission
+    // Initial submission - using the direct endpoint to avoid routing issues
     statusUpdater.thinking();
-    const initialResponse = await apiClient.post('/question', { question });
+    const initialResponse = await apiClient.post('/api/question_direct', { question });
     
     // Get request ID for polling or WebSocket
     const { requestId, statusUrl } = initialResponse.data;
@@ -71,8 +71,8 @@ const pollForResult = async (requestId, statusUpdater, progressCallback) => {
   
   while (pollCount < MAX_POLLS) {
     try {
-      // Check the current status
-      const statusResponse = await apiClient.get(`/question/${requestId}/status`);
+      // Check the current status - using the direct endpoint to avoid routing issues
+      const statusResponse = await apiClient.get(`/api/question_direct/requestId/${requestId}/status`);
       const { status, stage, progress, resultReady, message } = statusResponse.data;
       
       // Update the UI with current status
@@ -103,9 +103,9 @@ const pollForResult = async (requestId, statusUpdater, progressCallback) => {
         throw new Error('Failed to process your question');
       }
       
-      // If the result is ready, get it and return
+      // If the result is ready, get it and return - using the direct endpoint to avoid routing issues
       if (resultReady) {
-        const resultResponse = await apiClient.get(`/question/${requestId}/result`);
+        const resultResponse = await apiClient.get(`/api/question_direct/requestId/${requestId}/result`);
         return resultResponse.data;
       }
       
@@ -122,10 +122,11 @@ const pollForResult = async (requestId, statusUpdater, progressCallback) => {
 };
 
 // Get previous conversation history (for future implementation)
+// Not implemented yet
 export const getConversationHistory = async () => {
   try {
-    const response = await apiClient.get('/history');
-    return response.data;
+    // This functionality is not yet implemented
+    return { conversations: [] };
   } catch (error) {
     console.error('Error getting conversation history:', error);
     throw error;

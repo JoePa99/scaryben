@@ -1,6 +1,5 @@
-// Direct access to the status API endpoint
-// This creates a route at /question/[requestId]/status
-import { getRequest } from '../../../utils/server-state';
+// Direct access to the status API endpoint via /api/question_direct/requestId/[id]/status
+import { getRequest } from '../../../../../utils/server-state';
 
 export default function handler(req, res) {
   if (req.method !== 'GET') {
@@ -8,13 +7,13 @@ export default function handler(req, res) {
   }
 
   try {
-    const { requestId } = req.query;
+    const { id } = req.query;
     
-    if (!requestId) {
+    if (!id) {
       return res.status(400).json({ error: 'Request ID is required' });
     }
 
-    const requestData = getRequest(requestId);
+    const requestData = getRequest(id);
     
     if (!requestData) {
       return res.status(404).json({ error: 'Request not found' });
@@ -24,7 +23,7 @@ export default function handler(req, res) {
     const { result, ...statusData } = requestData;
     
     return res.status(200).json({
-      requestId,
+      requestId: id,
       ...statusData,
       resultReady: requestData.status === 'completed'
     });

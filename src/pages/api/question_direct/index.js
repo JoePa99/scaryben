@@ -1,8 +1,7 @@
-// Direct access to the question API endpoint
-// This creates a route at /question
-import { FRANKLIN_PERSONA } from '../../utils/prompts';
+// Direct access to the question API endpoint via /api/question_direct
+import { FRANKLIN_PERSONA } from '../../../utils/prompts';
 import axios from 'axios';
-import { setRequest, updateRequest, deleteRequest, fakeDemoMode, simulateProcessing } from '../../utils/server-state';
+import { setRequest, updateRequest, deleteRequest, fakeDemoMode, simulateProcessing } from '../../../utils/server-state';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -28,8 +27,8 @@ export default async function handler(req, res) {
       requestId,
       status: 'processing',
       message: 'Your question is being processed',
-      statusUrl: `/question/${requestId}/status`,
-      resultUrl: `/question/${requestId}/result`
+      statusUrl: `/api/question_direct/requestId/${requestId}/status`,
+      resultUrl: `/api/question_direct/requestId/${requestId}/result`
     });
   } catch (error) {
     console.error('API Error:', error);
