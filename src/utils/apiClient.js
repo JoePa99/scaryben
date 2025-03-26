@@ -1,9 +1,10 @@
 import axios from 'axios';
 
 // Create axios instance with default configs
-// Note: baseURL is set to '/api', so all paths in apiService.js should NOT include '/api/' prefix
+// We're now using direct routes instead of /api routes
+// This was changed to fix routing issues in production
 const apiClient = axios.create({
-  baseURL: '/api',
+  baseURL: '/',
   timeout: 120000, // 2 minutes - we need a long timeout for the video generation
   headers: {
     'Content-Type': 'application/json',

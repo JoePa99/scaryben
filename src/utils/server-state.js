@@ -32,8 +32,8 @@ export const updateRequest = (requestId, updates) => {
   return null;
 };
 
-// For demo purposes only - set to true to force demo mode for testing
-export const fakeDemoMode = process.env.FAKE_DEMO_MODE === 'true' || true; // Temporary override for testing
+// For demo purposes only - ALWAYS enabled for now until we fix API issues
+export const fakeDemoMode = true;
 
 // This function is used only in demo mode - you can safely remove it in production
 export const simulateProcessing = async (requestId, question) => {
