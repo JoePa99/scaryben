@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+// Tell Next.js this is a client-only component
+export const getStaticProps = async () => {
+  return {
+    props: {}
+  };
+};
+
 export default function DebugClient() {
   const [status, setStatus] = useState('Initializing...');
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [browserInfo, setBrowserInfo] = useState({});
 
   const testDirectApi = async () => {
     try {
@@ -19,7 +27,17 @@ export default function DebugClient() {
   };
 
   useEffect(() => {
-    testDirectApi();
+    // Only run in browser environment
+    if (typeof window !== 'undefined') {
+      // Capture browser info safely
+      setBrowserInfo({
+        userAgent: window.navigator?.userAgent || 'Unknown',
+        url: window.location?.href || 'Unknown',
+        time: new Date().toISOString()
+      });
+      
+      testDirectApi();
+    }
   }, []);
 
   return (
@@ -60,13 +78,13 @@ export default function DebugClient() {
         <h2>Environment Information</h2>
         <ul>
           <li>
-            <strong>Browser:</strong> {navigator.userAgent}
+            <strong>Browser:</strong> {browserInfo.userAgent}
           </li>
           <li>
-            <strong>Page URL:</strong> {window.location.href}
+            <strong>Page URL:</strong> {browserInfo.url}
           </li>
           <li>
-            <strong>Time:</strong> {new Date().toISOString()}
+            <strong>Time:</strong> {browserInfo.time || new Date().toISOString()}
           </li>
         </ul>
       </div>
