@@ -64,7 +64,7 @@ export const submitQuestion = async (question, statusCallback, progressCallback)
 
 // Poll for status and result (fallback if WebSocket doesn't work)
 const pollForResult = async (requestId, statusUpdater, progressCallback) => {
-  const MAX_POLLS = 60; // 1 minute at 1 second intervals
+  const MAX_POLLS = 300; // 5 minutes at 1 second intervals
   const POLL_INTERVAL = 1000; // 1 second
   
   let pollCount = 0;
@@ -105,6 +105,7 @@ const pollForResult = async (requestId, statusUpdater, progressCallback) => {
       
       // If the result is ready, get it and return - use the original endpoint path
       if (resultReady) {
+        console.log(`Result is ready, retrieving from /api/question/${requestId}/result`);
         const resultResponse = await apiClient.get(`/api/question/${requestId}/result`);
         return resultResponse.data;
       }

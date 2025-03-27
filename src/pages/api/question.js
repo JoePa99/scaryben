@@ -154,10 +154,10 @@ async function processQuestionAsync(requestId, question) {
       }
     });
 
-    // Clean up after 1 hour (in a real app, this would be stored in a database)
+    // Clean up after 2 hours (in a real app, this would be stored in a database)
     setTimeout(() => {
       deleteRequest(requestId);
-    }, 60 * 60 * 1000);
+    }, 2 * 60 * 60 * 1000);
   } catch (error) {
     const errorDetail = {
       message: error.message,
@@ -266,7 +266,8 @@ async function generateAndUploadSpeech(text) {
           'Content-Type': 'application/json',
           'xi-api-key': process.env.ELEVENLABS_API_KEY,
         },
-        responseType: 'arraybuffer'
+        responseType: 'arraybuffer',
+        timeout: 120000 // 2 minute timeout
       }
     );
     
@@ -419,6 +420,7 @@ async function generateVideo(audioUrl) {
           'Content-Type': 'application/json',
           'Authorization': `Basic ${process.env.DID_API_KEY}`,
         },
+        timeout: 300000 // 5 minute timeout
       }
     );
 
@@ -442,7 +444,7 @@ async function generateVideo(audioUrl) {
 async function waitForVideoCompletion(talkId) {
   // Poll the D-ID API until the video is ready
   let attempts = 0;
-  const maxAttempts = 30; // 30 attempts * 2 second delay = max 1 minute wait
+  const maxAttempts = 150; // 150 attempts * 2 second delay = max 5 minutes wait
   console.log(`Waiting for D-ID video to complete, talk ID: ${talkId}`);
 
   while (attempts < maxAttempts) {
@@ -454,6 +456,7 @@ async function waitForVideoCompletion(talkId) {
           headers: {
             'Authorization': `Basic ${process.env.DID_API_KEY}`,
           },
+          timeout: 30000 // 30 second timeout per poll request
         }
       );
 

@@ -4,7 +4,7 @@ import axios from 'axios';
 // Using baseURL for consistent routing
 const apiClient = axios.create({
   baseURL: '/', // Root-relative URLs for simplicity
-  timeout: 120000, // 2 minutes - we need a long timeout for the video generation
+  timeout: 300000, // 5 minutes - we need a long timeout for the video generation
   headers: {
     'Content-Type': 'application/json',
   },

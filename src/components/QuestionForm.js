@@ -33,6 +33,7 @@ const QuestionForm = () => {
     
     if (!question.trim()) return;
 
+    console.log('Submitting question:', question);
     try {
       setLoading(true);
       setError('');
@@ -40,24 +41,28 @@ const QuestionForm = () => {
       setAnswer('');
       setProgress(0);
 
+      console.log('Starting question submission process...');
       const response = await submitQuestion(
         question, 
         handleStatusUpdate,
         handleProgressUpdate
       );
       
+      console.log('Received response:', response);
       setVideoUrl(response.videoUrl);
       setAnswer(response.answer);
+      console.log('Video URL set to:', response.videoUrl);
     } catch (err) {
+      console.error('Error during question submission:', err);
       setError(
         err.message || 
         'An error occurred while processing your question. Please try again.'
       );
-      console.error(err);
     } finally {
       setLoading(false);
       setProgress(-1);
       setStatus('');
+      console.log('Question submission process completed');
     }
   };
 
