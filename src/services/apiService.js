@@ -16,10 +16,15 @@ export const submitQuestion = async (question, statusCallback, progressCallback)
     
     // Set up WebSocket listener for real-time updates
     let unsubscribe;
+    let isResolved = false;
+    
+    console.log(`Setting up web socket and polling for request ID: ${requestId}`);
     
     const result = await new Promise((resolve, reject) => {
       // Set up socket listener
       unsubscribe = subscribeToProcessUpdates(requestId, (update) => {
+        console.log(`Socket update received for ${requestId}:`, update);
+        
         // Update UI with progress
         if (update.message) {
           statusCallback(update.message);
@@ -29,7 +34,9 @@ export const submitQuestion = async (question, statusCallback, progressCallback)
         }
         
         // Handle completion or failure
-        if (update.status === 'completed') {
+        if (update.status === 'completed' && !isResolved) {
+          console.log(`Request ${requestId} completed via socket`);
+          isResolved = true;
           // When completed, fetch the final result
           apiClient.get(`/api/question/${requestId}/result`)
             .then(response => {
@@ -38,15 +45,30 @@ export const submitQuestion = async (question, statusCallback, progressCallback)
             .catch(error => {
               reject(error);
             });
-        } else if (update.status === 'failed') {
+        } else if (update.status === 'failed' && !isResolved) {
+          console.log(`Request ${requestId} failed via socket`);
+          isResolved = true;
           reject(new Error('Failed to process your question'));
         }
       });
       
       // Set up fallback polling in case WebSocket fails
+      console.log(`Setting up fallback polling for ${requestId}`);
       pollForResult(requestId, statusUpdater, progressCallback)
-        .then(resolve)
-        .catch(reject);
+        .then(result => {
+          if (!isResolved) {
+            console.log(`Request ${requestId} completed via polling`);
+            isResolved = true;
+            resolve(result);
+          }
+        })
+        .catch(error => {
+          if (!isResolved) {
+            console.log(`Request ${requestId} failed via polling: ${error.message}`);
+            isResolved = true;
+            reject(error);
+          }
+        });
     });
     
     // Clean up WebSocket listener

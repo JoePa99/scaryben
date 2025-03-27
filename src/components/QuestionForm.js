@@ -16,6 +16,11 @@ const QuestionForm = () => {
   // Initialize socket connection
   useEffect(() => {
     initializeSocket();
+    
+    // Reset loading state on component mount in case it was stuck
+    setLoading(false);
+    setProgress(-1);
+    setStatus('');
   }, []);
 
   const handleStatusUpdate = useCallback((newStatus) => {
@@ -70,6 +75,14 @@ const QuestionForm = () => {
     handleSubmit();
   };
 
+  const isButtonDisabled = loading || !question.trim();
+  
+  console.log('Form state:', { 
+    question: question, 
+    loading,
+    buttonDisabled: isButtonDisabled 
+  });
+  
   return (
     <div>
       <form className="question-form" onSubmit={handleSubmit}>
@@ -82,7 +95,11 @@ const QuestionForm = () => {
             disabled={loading}
           />
         </div>
-        <button type="submit" disabled={loading || !question.trim()}>
+        <button 
+          type="submit" 
+          disabled={isButtonDisabled}
+          onClick={() => console.log('Button clicked, disabled:', isButtonDisabled)}
+        >
           Ask Franklin
         </button>
       </form>
