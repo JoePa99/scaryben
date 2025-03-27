@@ -1,25 +1,104 @@
-// This is a simple in-memory store that will persist between API requests
-// In a production app, you would use a database instead
+// This is a more robust state implementation that works better with serverless functions
+// It uses file storage when in production on Vercel (in /tmp directory)
+// In a real production app, you would use a proper database like MongoDB, PostgreSQL, or Vercel KV
 
-// NOTE: This approach works better on Vercel than pure serverless environments
-// but is still not 100% reliable for production. In production, you should use
-// a proper database like MongoDB, PostgreSQL, or a serverless database.
+import fs from 'fs';
+import path from 'path';
 
+// Define the storage file path (in /tmp for Vercel serverless compatibility)
+const FILE_STORAGE = process.env.NODE_ENV === 'production' 
+  ? '/tmp/franklin-requests.json' 
+  : path.join(process.cwd(), '.franklin-requests.json');
+
+// Memory fallback (when file operations fail)
 const pendingRequests = new Map();
 
+// Load requests from storage file if it exists
+const loadRequestsFromFile = () => {
+  try {
+    if (fs.existsSync(FILE_STORAGE)) {
+      const fileContent = fs.readFileSync(FILE_STORAGE, 'utf8');
+      const data = JSON.parse(fileContent);
+      
+      // Convert back to Map
+      Object.keys(data).forEach(key => {
+        pendingRequests.set(key, data[key]);
+      });
+      
+      console.log(`[STATE] Loaded ${pendingRequests.size} requests from file storage`);
+    }
+  } catch (error) {
+    console.error(`[STATE] Error loading from file: ${error.message}`);
+  }
+};
+
+// Save requests to storage file
+const saveRequestsToFile = () => {
+  try {
+    // Convert Map to regular object for serialization
+    const data = {};
+    pendingRequests.forEach((value, key) => {
+      data[key] = value;
+    });
+    
+    fs.writeFileSync(FILE_STORAGE, JSON.stringify(data, null, 2));
+    console.log(`[STATE] Saved ${pendingRequests.size} requests to file storage`);
+  } catch (error) {
+    console.error(`[STATE] Error saving to file: ${error.message}`);
+  }
+};
+
+// Initialize on module load
+try {
+  loadRequestsFromFile();
+} catch (error) {
+  console.error(`[STATE] Initialization error: ${error.message}`);
+}
+
+// Exports with file persistence
 export const getRequest = (requestId) => {
+  // Try to load the latest state first
+  try {
+    loadRequestsFromFile();
+  } catch (error) {
+    console.warn(`[STATE] Failed to refresh state for get: ${error.message}`);
+  }
+  
   return pendingRequests.get(requestId);
 };
 
 export const setRequest = (requestId, data) => {
   pendingRequests.set(requestId, data);
+  
+  console.log(`[STATE] Setting request ${requestId}, current count: ${pendingRequests.size}`);
+  
+  // Save to file
+  try {
+    saveRequestsToFile();
+  } catch (error) {
+    console.error(`[STATE] Failed to save state: ${error.message}`);
+  }
 };
 
 export const deleteRequest = (requestId) => {
   pendingRequests.delete(requestId);
+  
+  // Save to file
+  try {
+    saveRequestsToFile();
+  } catch (error) {
+    console.error(`[STATE] Failed to save state after delete: ${error.message}`);
+  }
 };
 
 export const updateRequest = (requestId, updates) => {
+  // First try to load latest state
+  try {
+    loadRequestsFromFile();
+  } catch (error) {
+    console.warn(`[STATE] Failed to refresh state for update: ${error.message}`);
+  }
+  
   const request = pendingRequests.get(requestId);
   if (request) {
     pendingRequests.set(requestId, {
@@ -27,15 +106,32 @@ export const updateRequest = (requestId, updates) => {
       ...updates,
       lastUpdated: Date.now()
     });
-    console.log(`Request ${requestId} updated:`, updates);
+    
+    console.log(`[STATE] Request ${requestId} updated:`, updates);
+    
+    // Save to file
+    try {
+      saveRequestsToFile();
+    } catch (error) {
+      console.error(`[STATE] Failed to save state after update: ${error.message}`);
+    }
+    
     return pendingRequests.get(requestId);
   }
-  console.warn(`Attempted to update non-existent request: ${requestId}`);
+  
+  console.warn(`[STATE] Attempted to update non-existent request: ${requestId}`);
   return null;
 };
 
 // Function to get all requests (for debugging)
 export const getAllRequests = () => {
+  // First try to load latest state
+  try {
+    loadRequestsFromFile();
+  } catch (error) {
+    console.warn(`[STATE] Failed to refresh state for getAll: ${error.message}`);
+  }
+  
   return pendingRequests;
 };
 
