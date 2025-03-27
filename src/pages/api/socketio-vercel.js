@@ -1,87 +1,70 @@
 // Enhanced Socket.IO endpoint optimized for Vercel
 import { Server } from 'socket.io';
 
-// Use a module-level variable to store the IO instance between invocations
-let ioInstance;
+// Create handler
+export default async function SocketHandler(req, res) {
+  // Check if socket is already initialized
+  if (res.socket.server.io) {
+    console.log('Socket.IO already initialized');
+    res.end('Socket.IO already running');
+    return;
+  }
 
-export default function handler(req, res) {
   try {
-    // Only handle WebSocket GET requests
-    if (req.method !== 'GET') {
-      return res.status(405).json({ error: 'Method not allowed' });
-    }
-
-    // Check if Socket.IO is already set up
-    if (res.socket.server.io) {
-      console.log('[SOCKET] Socket.IO already initialized');
-      
-      // Send a successful response
-      res.end('Socket.IO already running');
-      return;
-    }
-    
-    // Initialize socket server with specific Vercel-friendly config
+    // Create new server instance
     const io = new Server(res.socket.server, {
       path: '/api/socketio-vercel',
-      transports: ['polling', 'websocket'],
+      addTrailingSlash: false,
       cors: {
         origin: '*',
         methods: ['GET', 'POST'],
-        credentials: true
       },
-      // Specific settings for Vercel serverless
-      pingTimeout: 20000,
+      transports: ['polling', 'websocket'],
+      // Simplified settings for easier debugging
+      pingTimeout: 10000,
       pingInterval: 25000,
-      connectTimeout: 10000,
-      // Disable compression for edge environments
-      perMessageDeflate: false
     });
-    
-    // Save socket instance to re-use across API calls
+
+    // Store the io instance on the server object
     res.socket.server.io = io;
-    
-    // Common rooms for connection pooling
-    const rooms = new Map();
-    
-    // Socket.IO connection handling
+
+    // Set up connection handler
     io.on('connection', (socket) => {
-      console.log('[SOCKET] Client connected:', socket.id);
-      
-      // Handle joining request-specific rooms
+      console.log(`Socket connected: ${socket.id}`);
+
+      // Join specific request channel
       socket.on('join', ({ requestId }) => {
         if (!requestId) return;
-        
-        socket.join(`request:${requestId}`);
-        rooms.set(requestId, (rooms.get(requestId) || 0) + 1);
-        console.log(`[SOCKET] Client ${socket.id} joined room for request ${requestId}`);
+        const room = `process:${requestId}`;
+        socket.join(room);
+        console.log(`Socket ${socket.id} joined room ${room}`);
       });
-      
-      // Handle leaving rooms
+
+      // Leave specific request channel
       socket.on('leave', ({ requestId }) => {
         if (!requestId) return;
-        
-        socket.leave(`request:${requestId}`);
-        const count = rooms.get(requestId) || 0;
-        if (count > 0) rooms.set(requestId, count - 1);
-        console.log(`[SOCKET] Client ${socket.id} left room for request ${requestId}`);
+        const room = `process:${requestId}`;
+        socket.leave(room);
+        console.log(`Socket ${socket.id} left room ${room}`);
       });
-      
-      // Clean up on disconnect
+
+      // Cleanup on disconnect
       socket.on('disconnect', () => {
-        console.log('[SOCKET] Client disconnected:', socket.id);
+        console.log(`Socket disconnected: ${socket.id}`);
       });
     });
-    
-    // Store for re-use across serverless functions
-    ioInstance = io;
-    
-    console.log('[SOCKET] Socket.IO initialized successfully');
+
+    // Send messages to specific request
+    io.emitToRequest = (requestId, event, data) => {
+      if (!requestId) return;
+      const room = `process:${requestId}`;
+      io.to(room).emit(event, data);
+    };
+
+    console.log('Socket.IO server initialized');
     res.end('Socket.IO initialized');
   } catch (error) {
-    console.error('[SOCKET] Error initializing Socket.IO:', error);
-    res.status(500).json({ error: 'Failed to initialize Socket.IO', details: error.message });
+    console.error('Socket initialization error:', error);
+    res.status(500).json({ error: error.message });
   }
 }
-
-// Export io instance for use in other files
-export { ioInstance };

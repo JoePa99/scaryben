@@ -13,40 +13,39 @@ if (!supabaseKey && (process.env.NODE_ENV === 'development' || !process.env.NODE
   supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnbWV0Z3NpZHlqcWdnZ3F1a3VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwOTI5MjYsImV4cCI6MjA1ODY2ODkyNn0.XJHEM7Bq99SQaNj2q4VvEY-HNQaSXrw7x1PGrn46MVc';
 }
 
-// Create the client with error handling
-try {
-  if (!supabaseUrl) {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
-  }
-  
-  if (!supabaseKey) {
-    throw new Error('Missing Supabase key - please set SUPABASE_SERVICE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  }
-  
-  const supabase = createClient(supabaseUrl, supabaseKey, {
-    auth: {
-      persistSession: false // Don't persist sessions in serverless
-    }
-  });
-  
-  console.log(`[SUPABASE] Initialized with URL: ${supabaseUrl}`);
-  
-  // Export the client
-  export default supabase;
-} catch (error) {
-  console.error(`[SUPABASE] Failed to initialize: ${error.message}`);
-  
-  // Create an empty client that returns errors for all operations
-  // This prevents the app from crashing completely when Supabase is misconfigured
-  const errorClient = {
+// Function to create a dummy client that just returns errors
+// This prevents crashes when Supabase is misconfigured
+const createErrorClient = () => {
+  return {
     from: () => ({
       select: () => Promise.resolve({ data: null, error: new Error('Supabase client not initialized') }),
       insert: () => Promise.resolve({ data: null, error: new Error('Supabase client not initialized') }),
       update: () => Promise.resolve({ data: null, error: new Error('Supabase client not initialized') }),
       delete: () => Promise.resolve({ data: null, error: new Error('Supabase client not initialized') }),
+      eq: () => ({ single: () => Promise.resolve({ data: null, error: new Error('Supabase client not initialized') }) })
     }),
     rpc: () => Promise.resolve({ data: null, error: new Error('Supabase client not initialized') })
   };
-  
-  export default errorClient;
+};
+
+// Initialize Supabase client
+let supabase;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('[SUPABASE] Missing URL or API key - using dummy client');
+  supabase = createErrorClient();
+} else {
+  try {
+    supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false
+      }
+    });
+    console.log(`[SUPABASE] Initialized with URL: ${supabaseUrl}`);
+  } catch (error) {
+    console.error(`[SUPABASE] Failed to initialize: ${error.message}`);
+    supabase = createErrorClient();
+  }
 }
+
+export default supabase;
