@@ -1,12 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Configure async API request timeouts
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-    responseLimit: false,
+  // Vercel-optimized configuration
+  experimental: {
+    // Configure async API request timeouts
+    serverComponentsExternalPackages: ['socket.io', '@supabase/supabase-js'],
   },
   // Allow Socket.io to work properly
   webpack: (config, { isServer }) => {

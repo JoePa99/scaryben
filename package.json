@@ -20,6 +20,8 @@
     "socket.io-client": "^4.7.2",
     "@supabase/supabase-js": "^2.49.3"
   },
-  "devDependencies": {}
-  
+  "devDependencies": {
+    "eslint": "^8.35.0",
+    "eslint-config-next": "13.2.3"
+  }
 }
