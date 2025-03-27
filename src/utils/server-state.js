@@ -1,138 +1,199 @@
-// This is a more robust state implementation that works better with serverless functions
-// It uses file storage when in production on Vercel (in /tmp directory)
-// In a real production app, you would use a proper database like MongoDB, PostgreSQL, or Vercel KV
+// This implementation uses Supabase for state storage in serverless environments
+// Much more reliable and scalable than in-memory or file-based storage
 
-import fs from 'fs';
-import path from 'path';
+import supabase from './supabase-client';
 
-// Define the storage file path (in /tmp for Vercel serverless compatibility)
-const FILE_STORAGE = process.env.NODE_ENV === 'production' 
-  ? '/tmp/franklin-requests.json' 
-  : path.join(process.cwd(), '.franklin-requests.json');
+// Cache for performance
+const requestCache = new Map();
 
-// Memory fallback (when file operations fail)
-const pendingRequests = new Map();
+// Table name in Supabase
+const TABLE_NAME = 'franklin_requests';
 
-// Load requests from storage file if it exists
-const loadRequestsFromFile = () => {
+// Get a request by ID
+export const getRequest = async (requestId) => {
+  // Check cache first for performance
+  if (requestCache.has(requestId)) {
+    return requestCache.get(requestId);
+  }
+
   try {
-    if (fs.existsSync(FILE_STORAGE)) {
-      const fileContent = fs.readFileSync(FILE_STORAGE, 'utf8');
-      const data = JSON.parse(fileContent);
-      
-      // Convert back to Map
-      Object.keys(data).forEach(key => {
-        pendingRequests.set(key, data[key]);
-      });
-      
-      console.log(`[STATE] Loaded ${pendingRequests.size} requests from file storage`);
+    // Query Supabase for the request
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select('*')
+      .eq('request_id', requestId)
+      .single();
+
+    if (error) {
+      console.error(`[SUPABASE] Error getting request ${requestId}:`, error.message);
+      return null;
     }
-  } catch (error) {
-    console.error(`[STATE] Error loading from file: ${error.message}`);
-  }
-};
 
-// Save requests to storage file
-const saveRequestsToFile = () => {
-  try {
-    // Convert Map to regular object for serialization
-    const data = {};
-    pendingRequests.forEach((value, key) => {
-      data[key] = value;
-    });
+    if (!data) {
+      console.log(`[SUPABASE] Request ${requestId} not found`);
+      return null;
+    }
+
+    // Parse the JSON fields
+    const request = {
+      ...data,
+      result: data.result ? JSON.parse(data.result) : null,
+      error: data.error ? JSON.parse(data.error) : null
+    };
+
+    // Update cache
+    requestCache.set(requestId, request);
     
-    fs.writeFileSync(FILE_STORAGE, JSON.stringify(data, null, 2));
-    console.log(`[STATE] Saved ${pendingRequests.size} requests to file storage`);
+    console.log(`[SUPABASE] Retrieved request ${requestId}`);
+    return request;
   } catch (error) {
-    console.error(`[STATE] Error saving to file: ${error.message}`);
+    console.error(`[SUPABASE] Exception getting request ${requestId}:`, error.message);
+    return null;
   }
 };
 
-// Initialize on module load
-try {
-  loadRequestsFromFile();
-} catch (error) {
-  console.error(`[STATE] Initialization error: ${error.message}`);
-}
-
-// Exports with file persistence
-export const getRequest = (requestId) => {
-  // Try to load the latest state first
+// Set a new request
+export const setRequest = async (requestId, data) => {
   try {
-    loadRequestsFromFile();
-  } catch (error) {
-    console.warn(`[STATE] Failed to refresh state for get: ${error.message}`);
-  }
-  
-  return pendingRequests.get(requestId);
-};
+    // Prepare data for Supabase
+    const dbData = {
+      request_id: requestId,
+      status: data.status,
+      stage: data.stage,
+      progress: data.progress,
+      message: data.message,
+      start_time: new Date(data.startTime).toISOString(),
+      last_updated: new Date().toISOString(),
+      question: data.question,
+      result: data.result ? JSON.stringify(data.result) : null,
+      error: data.error ? JSON.stringify(data.error) : null
+    };
 
-export const setRequest = (requestId, data) => {
-  pendingRequests.set(requestId, data);
-  
-  console.log(`[STATE] Setting request ${requestId}, current count: ${pendingRequests.size}`);
-  
-  // Save to file
-  try {
-    saveRequestsToFile();
-  } catch (error) {
-    console.error(`[STATE] Failed to save state: ${error.message}`);
-  }
-};
+    // Insert into Supabase
+    const { error } = await supabase
+      .from(TABLE_NAME)
+      .insert(dbData);
 
-export const deleteRequest = (requestId) => {
-  pendingRequests.delete(requestId);
-  
-  // Save to file
-  try {
-    saveRequestsToFile();
+    if (error) {
+      console.error(`[SUPABASE] Error setting request ${requestId}:`, error.message);
+      return null;
+    }
+
+    // Update cache
+    requestCache.set(requestId, data);
+    
+    console.log(`[SUPABASE] Saved request ${requestId}`);
+    return data;
   } catch (error) {
-    console.error(`[STATE] Failed to save state after delete: ${error.message}`);
+    console.error(`[SUPABASE] Exception setting request ${requestId}:`, error.message);
+    return null;
   }
 };
 
-export const updateRequest = (requestId, updates) => {
-  // First try to load latest state
+// Delete a request
+export const deleteRequest = async (requestId) => {
   try {
-    loadRequestsFromFile();
+    // Remove from Supabase
+    const { error } = await supabase
+      .from(TABLE_NAME)
+      .delete()
+      .eq('request_id', requestId);
+
+    if (error) {
+      console.error(`[SUPABASE] Error deleting request ${requestId}:`, error.message);
+      return false;
+    }
+
+    // Remove from cache
+    requestCache.delete(requestId);
+    
+    console.log(`[SUPABASE] Deleted request ${requestId}`);
+    return true;
   } catch (error) {
-    console.warn(`[STATE] Failed to refresh state for update: ${error.message}`);
+    console.error(`[SUPABASE] Exception deleting request ${requestId}:`, error.message);
+    return false;
   }
-  
-  const request = pendingRequests.get(requestId);
-  if (request) {
-    pendingRequests.set(requestId, {
-      ...request,
+};
+
+// Update an existing request
+export const updateRequest = async (requestId, updates) => {
+  try {
+    // Get the current state first
+    const currentData = await getRequest(requestId);
+    
+    if (!currentData) {
+      console.warn(`[SUPABASE] Cannot update request ${requestId} - not found`);
+      return null;
+    }
+
+    // Create the updated data
+    const updatedData = {
+      ...currentData,
       ...updates,
-      lastUpdated: Date.now()
-    });
-    
-    console.log(`[STATE] Request ${requestId} updated:`, updates);
-    
-    // Save to file
-    try {
-      saveRequestsToFile();
-    } catch (error) {
-      console.error(`[STATE] Failed to save state after update: ${error.message}`);
+      last_updated: new Date().toISOString()
+    };
+
+    // Prepare the database update
+    const dbUpdates = {
+      status: updatedData.status,
+      stage: updatedData.stage,
+      progress: updatedData.progress,
+      message: updatedData.message,
+      last_updated: updatedData.last_updated,
+      result: updatedData.result ? JSON.stringify(updatedData.result) : null,
+      error: updatedData.error ? JSON.stringify(updatedData.error) : null
+    };
+
+    // Update in Supabase
+    const { error } = await supabase
+      .from(TABLE_NAME)
+      .update(dbUpdates)
+      .eq('request_id', requestId);
+
+    if (error) {
+      console.error(`[SUPABASE] Error updating request ${requestId}:`, error.message);
+      return null;
     }
+
+    // Update cache with the new merged data
+    const cachedData = {
+      ...currentData,
+      ...updates,
+      lastUpdated: new Date().getTime()
+    };
+    requestCache.set(requestId, cachedData);
     
-    return pendingRequests.get(requestId);
+    console.log(`[SUPABASE] Updated request ${requestId}:`, updates);
+    return cachedData;
+  } catch (error) {
+    console.error(`[SUPABASE] Exception updating request ${requestId}:`, error.message);
+    return null;
   }
-  
-  console.warn(`[STATE] Attempted to update non-existent request: ${requestId}`);
-  return null;
 };
 
-// Function to get all requests (for debugging)
-export const getAllRequests = () => {
-  // First try to load latest state
+// Get all requests
+export const getAllRequests = async () => {
   try {
-    loadRequestsFromFile();
+    // Query Supabase for all requests
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select('*')
+      .order('last_updated', { ascending: false });
+
+    if (error) {
+      console.error('[SUPABASE] Error getting all requests:', error.message);
+      return [];
+    }
+
+    return data.map(item => ({
+      ...item,
+      result: item.result ? JSON.parse(item.result) : null,
+      error: item.error ? JSON.parse(item.error) : null
+    }));
   } catch (error) {
-    console.warn(`[STATE] Failed to refresh state for getAll: ${error.message}`);
+    console.error('[SUPABASE] Exception getting all requests:', error.message);
+    return [];
   }
-  
-  return pendingRequests;
 };
 
 // Demo mode - set to false to use real APIs
@@ -157,7 +218,7 @@ const SAMPLE_ANSWERS = {
 // This function is used only in demo mode - you can safely remove it in production
 export const simulateProcessing = async (requestId, question) => {
   // Initialize the request
-  setRequest(requestId, {
+  await setRequest(requestId, {
     status: 'processing',
     stage: 'thinking',
     progress: 0,
@@ -170,7 +231,7 @@ export const simulateProcessing = async (requestId, question) => {
   try {
     // Simulate thinking stage (3 seconds)
     await new Promise(resolve => setTimeout(resolve, 1000));
-    updateRequest(requestId, {
+    await updateRequest(requestId, {
       stage: 'thinking',
       progress: 20,
       message: 'Generating Franklin\'s response'
@@ -178,7 +239,7 @@ export const simulateProcessing = async (requestId, question) => {
 
     // Simulate animation generation (6 seconds)
     await new Promise(resolve => setTimeout(resolve, 3000));
-    updateRequest(requestId, {
+    await updateRequest(requestId, {
       stage: 'animating',
       progress: 60,
       message: 'Animating Benjamin Franklin'
@@ -197,7 +258,7 @@ export const simulateProcessing = async (requestId, question) => {
 
     // Complete the request with demo data
     await new Promise(resolve => setTimeout(resolve, 3000));
-    updateRequest(requestId, {
+    await updateRequest(requestId, {
       status: 'completed',
       stage: 'completed',
       progress: 100,
@@ -214,7 +275,7 @@ export const simulateProcessing = async (requestId, question) => {
       deleteRequest(requestId);
     }, 60 * 60 * 1000);
   } catch (error) {
-    updateRequest(requestId, {
+    await updateRequest(requestId, {
       status: 'failed',
       error: {
         message: error.message,

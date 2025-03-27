@@ -1,7 +1,7 @@
 // Access the pending requests map from our server state module
 import { getRequest } from '../../../../utils/server-state';
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -15,16 +15,15 @@ export default function handler(req, res) {
     }
 
     console.log(`[SERVER] Status request for ID: ${requestId}`);
-    const requestData = getRequest(requestId);
+    const requestData = await getRequest(requestId);
     
     if (!requestData) {
-      console.log(`[SERVER] Request ${requestId} not found in server state`);
+      console.log(`[SERVER] Request ${requestId} not found in database`);
       return res.status(404).json({ error: 'Request not found' });
     }
     
     console.log(`[SERVER] Request ${requestId} found, status: ${requestData.status}, stage: ${requestData.stage}`);
     
-
     // Return the current status without the full result
     const { result, ...statusData } = requestData;
     

@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     // Create a unique ID for this request
     const requestId = Date.now().toString();
     
-    console.log(`[SERVER] New question received. Creating request ${requestId}`);
+    console.log(`[SERVER] New question received. Creating request ${requestId} in Supabase`);
     
     // Check for required environment variables before proceeding
     const requiredEnvVars = [
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
         console.error(`Missing required environment variables: ${missingVars.join(', ')}`);
         
         // Initialize request with error status
-        setRequest(requestId, {
+        await setRequest(requestId, {
           status: 'failed',
           stage: 'setup',
           progress: 0,
@@ -80,10 +80,12 @@ export default async function handler(req, res) {
     if (fakeDemoMode) {
       // Use fake demo mode with reliable sample videos
       console.log('Using demo mode with sample videos');
+      // Don't await here - let it run in the background
       simulateProcessing(requestId, question);
     } else {
       // Use real APIs in production
       console.log('Using real APIs (OpenAI, ElevenLabs, D-ID)');
+      // Don't await here - let it run in the background
       processQuestionAsync(requestId, question);
     }
     
@@ -122,7 +124,7 @@ async function processQuestionAsync(requestId, question) {
   console.log(`[SERVER] Starting processing for request ${requestId}`);
   
   // Initialize request state
-  setRequest(requestId, {
+  await setRequest(requestId, {
     status: 'processing',
     stage: 'thinking',
     progress: 0,
@@ -133,14 +135,14 @@ async function processQuestionAsync(requestId, question) {
   });
 
   try {
-    console.log(`[SERVER] Request ${requestId} initialized in state`);
+    console.log(`[SERVER] Request ${requestId} initialized in database`);
     
     // Verify the request was stored properly
-    const storedRequest = getRequest(requestId);
+    const storedRequest = await getRequest(requestId);
     if (!storedRequest) {
-      console.error(`[SERVER] CRITICAL ERROR: Request ${requestId} not properly stored in state!`);
+      console.error(`[SERVER] CRITICAL ERROR: Request ${requestId} not properly stored in database!`);
       // Try to store it again
-      setRequest(requestId, {
+      await setRequest(requestId, {
         status: 'processing',
         stage: 'thinking',
         progress: 0,
@@ -150,7 +152,7 @@ async function processQuestionAsync(requestId, question) {
         error: null
       });
     } else {
-      console.log(`[SERVER] Request ${requestId} confirmed in state`);
+      console.log(`[SERVER] Request ${requestId} confirmed in database`);
     }
 
     // Step 1: Get response from GPT-4
@@ -167,7 +169,7 @@ async function processQuestionAsync(requestId, question) {
     
     // Store the completed result
     console.log(`[SERVER] Request ${requestId} completed successfully`);
-    updateRequest(requestId, {
+    await updateRequest(requestId, {
       status: 'completed',
       stage: 'completed',
       progress: 100,
@@ -180,9 +182,9 @@ async function processQuestionAsync(requestId, question) {
     });
 
     // Verify completion was stored
-    const completedRequest = getRequest(requestId);
+    const completedRequest = await getRequest(requestId);
     if (!completedRequest || completedRequest.status !== 'completed') {
-      console.error(`[SERVER] CRITICAL ERROR: Completion status for ${requestId} not properly stored!`);
+      console.error(`[SERVER] CRITICAL ERROR: Completion status for ${requestId} not properly stored in database!`);
     }
 
     // Clean up after 2 hours (in a real app, this would be stored in a database)
@@ -202,22 +204,22 @@ async function processQuestionAsync(requestId, question) {
     console.error(`[SERVER] Processing Error for ${requestId}:`, JSON.stringify(errorDetail, null, 2));
     
     // Store the error
-    updateRequest(requestId, {
+    await updateRequest(requestId, {
       status: 'failed',
       error: errorDetail,
       endTime: Date.now()
     });
     
     // Verify error was stored
-    const failedRequest = getRequest(requestId);
+    const failedRequest = await getRequest(requestId);
     if (!failedRequest || failedRequest.status !== 'failed') {
-      console.error(`[SERVER] CRITICAL ERROR: Failure status for ${requestId} not properly stored!`);
+      console.error(`[SERVER] CRITICAL ERROR: Failure status for ${requestId} not properly stored in database!`);
     }
   }
 }
 
-function updateRequestStatus(requestId, stage, message, progress) {
-  const updatedRequest = updateRequest(requestId, {
+async function updateRequestStatus(requestId, stage, message, progress) {
+  const updatedRequest = await updateRequest(requestId, {
     stage,
     message,
     progress
