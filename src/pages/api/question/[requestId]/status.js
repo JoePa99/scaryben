@@ -10,14 +10,20 @@ export default function handler(req, res) {
     const { requestId } = req.query;
     
     if (!requestId) {
+      console.log(`[SERVER] Status request missing requestId parameter`);
       return res.status(400).json({ error: 'Request ID is required' });
     }
 
+    console.log(`[SERVER] Status request for ID: ${requestId}`);
     const requestData = getRequest(requestId);
     
     if (!requestData) {
+      console.log(`[SERVER] Request ${requestId} not found in server state`);
       return res.status(404).json({ error: 'Request not found' });
     }
+    
+    console.log(`[SERVER] Request ${requestId} found, status: ${requestData.status}, stage: ${requestData.stage}`);
+    
 
     // Return the current status without the full result
     const { result, ...statusData } = requestData;

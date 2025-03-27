@@ -27,6 +27,8 @@ export default async function handler(req, res) {
     // Create a unique ID for this request
     const requestId = Date.now().toString();
     
+    console.log(`[SERVER] New question received. Creating request ${requestId}`);
+    
     // Check for required environment variables before proceeding
     const requiredEnvVars = [
       'OPENAI_API_KEY',
@@ -117,17 +119,39 @@ export default async function handler(req, res) {
 // 2. Store request state in a database (MongoDB, PostgreSQL, etc.)
 // 3. Use WebSockets or Server-Sent Events for real-time updates
 async function processQuestionAsync(requestId, question) {
+  console.log(`[SERVER] Starting processing for request ${requestId}`);
+  
+  // Initialize request state
+  setRequest(requestId, {
+    status: 'processing',
+    stage: 'thinking',
+    progress: 0,
+    startTime: Date.now(),
+    question,
+    result: null,
+    error: null
+  });
+
   try {
-    // Initialize request state
-    setRequest(requestId, {
-      status: 'processing',
-      stage: 'thinking',
-      progress: 0,
-      startTime: Date.now(),
-      question,
-      result: null,
-      error: null
-    });
+    console.log(`[SERVER] Request ${requestId} initialized in state`);
+    
+    // Verify the request was stored properly
+    const storedRequest = getRequest(requestId);
+    if (!storedRequest) {
+      console.error(`[SERVER] CRITICAL ERROR: Request ${requestId} not properly stored in state!`);
+      // Try to store it again
+      setRequest(requestId, {
+        status: 'processing',
+        stage: 'thinking',
+        progress: 0,
+        startTime: Date.now(),
+        question,
+        result: null,
+        error: null
+      });
+    } else {
+      console.log(`[SERVER] Request ${requestId} confirmed in state`);
+    }
 
     // Step 1: Get response from GPT-4
     updateRequestStatus(requestId, 'thinking', 'Generating Franklin\'s response', 10);
@@ -142,6 +166,7 @@ async function processQuestionAsync(requestId, question) {
     const videoUrl = await generateVideo(audioUrl);
     
     // Store the completed result
+    console.log(`[SERVER] Request ${requestId} completed successfully`);
     updateRequest(requestId, {
       status: 'completed',
       stage: 'completed',
@@ -154,8 +179,15 @@ async function processQuestionAsync(requestId, question) {
       }
     });
 
+    // Verify completion was stored
+    const completedRequest = getRequest(requestId);
+    if (!completedRequest || completedRequest.status !== 'completed') {
+      console.error(`[SERVER] CRITICAL ERROR: Completion status for ${requestId} not properly stored!`);
+    }
+
     // Clean up after 2 hours (in a real app, this would be stored in a database)
     setTimeout(() => {
+      console.log(`[SERVER] Cleaning up request ${requestId} after timeout`);
       deleteRequest(requestId);
     }, 2 * 60 * 60 * 1000);
   } catch (error) {
@@ -167,7 +199,7 @@ async function processQuestionAsync(requestId, question) {
       code: error.code
     };
     
-    console.error('Processing Error:', JSON.stringify(errorDetail, null, 2));
+    console.error(`[SERVER] Processing Error for ${requestId}:`, JSON.stringify(errorDetail, null, 2));
     
     // Store the error
     updateRequest(requestId, {
@@ -175,6 +207,12 @@ async function processQuestionAsync(requestId, question) {
       error: errorDetail,
       endTime: Date.now()
     });
+    
+    // Verify error was stored
+    const failedRequest = getRequest(requestId);
+    if (!failedRequest || failedRequest.status !== 'failed') {
+      console.error(`[SERVER] CRITICAL ERROR: Failure status for ${requestId} not properly stored!`);
+    }
   }
 }
 

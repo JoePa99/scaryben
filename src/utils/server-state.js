@@ -27,9 +27,16 @@ export const updateRequest = (requestId, updates) => {
       ...updates,
       lastUpdated: Date.now()
     });
+    console.log(`Request ${requestId} updated:`, updates);
     return pendingRequests.get(requestId);
   }
+  console.warn(`Attempted to update non-existent request: ${requestId}`);
   return null;
+};
+
+// Function to get all requests (for debugging)
+export const getAllRequests = () => {
+  return pendingRequests;
 };
 
 // Demo mode - set to false to use real APIs
