@@ -17,9 +17,9 @@
     "react-dom": "^18.2.0",
     "react-loader-spinner": "^5.4.5",
     "socket.io": "^4.7.2",
-    "socket.io-client": "^4.7.2"
-  },
-  "devDependencies": {
+    "socket.io-client": "^4.7.2",
     "@supabase/supabase-js": "^2.49.3"
-  }
+  },
+  "devDependencies": {}
+  
 }

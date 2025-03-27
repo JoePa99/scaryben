@@ -3,7 +3,7 @@ import axios from 'axios';
 // Create axios instance with default configs
 // Using baseURL for consistent routing
 const apiClient = axios.create({
-  baseURL: '/', // Root-relative URLs for simplicity
+  baseURL: typeof window !== 'undefined' ? window.location.origin : '/', // Use current origin
   timeout: 300000, // 5 minutes - we need a long timeout for the video generation
   headers: {
     'Content-Type': 'application/json',
