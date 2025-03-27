@@ -31,7 +31,7 @@ export const submitQuestion = async (question, statusCallback, progressCallback)
         // Handle completion or failure
         if (update.status === 'completed') {
           // When completed, fetch the final result
-          apiClient.get(`/question/${requestId}/result`)
+          apiClient.get(`/api/question/${requestId}/result`)
             .then(response => {
               resolve(response.data);
             })
@@ -71,7 +71,8 @@ const pollForResult = async (requestId, statusUpdater, progressCallback) => {
   
   while (pollCount < MAX_POLLS) {
     try {
-      // Use the original endpoint path - more reliable
+      // Ensure correct endpoint path for the deployed version
+      console.log(`Checking status from: /api/question/${requestId}/status`);
       const statusResponse = await apiClient.get(`/api/question/${requestId}/status`);
       const { status, stage, progress, resultReady, message } = statusResponse.data;
       
